@@ -203,7 +203,6 @@ module GrapeSwagger
         }
 
         parsed_params.merge!(defaultValue: default_value) if default_value
-
         parsed_params
       end
     end
@@ -468,6 +467,8 @@ module GrapeSwagger
 
         output[:authorizations] = authorizations unless authorizations.nil? || authorizations.empty?
 
+        output.merge!(options[:custom]) if options[:custom]
+
         output
       end
 
@@ -545,6 +546,42 @@ module GrapeSwagger
             end
 
             operation[:nickname] = route.route_nickname if route.route_nickname
+
+            format = endpoint.namespace_inheritable(:format)
+            all_content_types = endpoint.namespace_stackable(:content_types).each_with_object({}) { |e, h| h.merge!(e) }
+
+            consumes_content_types = [all_content_types[format]]
+            operation[:consumes] = consumes_content_types if route.route_method != 'GET' && consumes_content_types && !consumes_content_types.empty?
+
+            route_produces = route.route_produces || endpoint.namespace_inheritable(:default_produces)
+            produces_content_types =
+              if route_produces == :take_consumes
+                consumes_content_types
+              elsif !route_produces.nil?
+                Array.wrap(route_produces).map { |e| all_content_types[e] || e }
+              end
+            operation[:produces] = produces_content_types if produces_content_types
+
+            custom_request_headers = endpoint.namespace_stackable(:swagger_request_headers)
+            if custom_request_headers && !custom_request_headers.empty?
+              headers = custom_request_headers.each_with_object({}) { |e, h| h.merge!(e) }
+              additional_params = @@documentation_class.parse_header_params(
+                headers,
+                scope: i18n_scope,
+                key: i18n_key
+              )
+              operation[:parameters] += additional_params
+            end
+
+            global_options = endpoint.namespace_stackable(:swagger_options)
+            global_options.each { |e| operation.merge!(e) }
+
+            other_options = route.route_swagger || {}
+            operation.merge!(other_options)
+
+            p operation
+            # binding.pry
+
             operation
           end.compact
           apis << {
