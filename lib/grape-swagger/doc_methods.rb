@@ -468,6 +468,8 @@ module GrapeSwagger
 
         output[:authorizations] = authorizations unless authorizations.nil? || authorizations.empty?
 
+        output.merge!(options[:custom]) if options[:custom]
+
         output
       end
 
